@@ -1,6 +1,7 @@
 azure-functions
+pandas
+numpy
 transformers
 tiktoken
 torch 
-sentence_transformers
-sentencepiece
+
