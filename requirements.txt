@@ -1,0 +1,6 @@
+azure-functions
+transformers
+tiktoken
+torch 
+sentence_transformers
+sentencepiece
