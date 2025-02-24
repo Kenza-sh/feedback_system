@@ -221,47 +221,36 @@ c=CommentClassifier()
 def compute_stats(data_json_format):
     logging.info("Début de l'exécution de compute_stats")
     
-    # Vérifier si le dictionnaire est vide ou mal formé
-    if not data_json_format or "Commentaire" not in data_json_format:
-        logging.warning("Données invalides : data_json_format est vide ou ne contient pas 'Commentaire'.")
+    if not data_json_format or "data" not in data_json_format or "Commentaire" not in data_json_format["data"]:
+        logging.warning("Données invalides : data_json_format mal structuré.")
         return {}, None, []
 
-    commentaires = data_json_format["Commentaire"]
+    commentaires = data_json_format["data"]["Commentaire"]
     
-    # Vérifier si la liste de commentaires est vide
-    if not commentaires or not all(isinstance(x, str) for x in commentaires):
-        logging.warning("Données invalides : 'Commentaire' est vide ou contient des éléments non textuels.")
+    if not isinstance(commentaires, list) or not all(isinstance(x, str) for x in commentaires):
+        logging.warning("Données invalides : 'Commentaire' doit être une liste de chaînes.")
         return {}, None, []
 
     try:
         df = pd.DataFrame({"Commentaire": commentaires})
         logging.info(f"DataFrame créé avec {len(df)} commentaires.")
 
-        # Appliquer get_stats en gérant les cas où cela retourne None
         df[['stats', 'note']] = df['Commentaire'].apply(
-            lambda x: pd.Series(c.get_stats(x) if c.get_stats(x) else ({}, None))
+            lambda x: pd.Series(c.get_stats(x))
         )
         logging.info("Extraction des statistiques terminée.")
 
-        # Calcul de la moyenne des notes
         moyenne_note = df['note'].mean() if not df['note'].isnull().all() else None
         logging.info(f"Moyenne des notes calculée : {moyenne_note}")
 
-        # Gestion des stats
         df_exploded = df.explode('stats')
         df_stats = pd.json_normalize(df_exploded['stats'])
 
-        # Calcul du score par catégorie si df_stats n'est pas vide
-        if not df_stats.empty:
-            score_par_categorie = (
-                df_stats.groupby("categorie")["note"].mean().reset_index().to_dict(orient="records")
-            )
-            logging.info(f"Score par catégorie calculé avec {len(score_par_categorie)} catégories.")
-        else:
-            score_par_categorie = []
-            logging.warning("Aucune statistique extraite (df_stats est vide).")
+        score_par_categorie = (
+            df_stats.groupby("categorie")["note"].mean().reset_index().to_dict(orient="records")
+            if not df_stats.empty else []
+        )
 
-        # Convertir le DataFrame en JSON
         json_output = df.to_json(orient="columns")
         json_dict = json.loads(json_output)
         logging.info("Conversion en JSON terminée.")
@@ -273,41 +262,37 @@ def compute_stats(data_json_format):
         logging.error(f"Erreur lors de l'exécution de compute_stats : {e}", exc_info=True)
         return {}, None, []
 
-
-
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
     try:
         req_body = req.get_json()
-        query = req_body.get('data')
-
-        if not query:
+        
+        if not req_body or "data" not in req_body:
             return func.HttpResponse(
-                json.dumps({"error": "No data provided in request body"}),
+                json.dumps({"error": "Invalid JSON: 'data' field is missing."}),
                 mimetype="application/json",
                 status_code=400
             )
-        
-        dff, note_moy , note_cat = compute_stats(query)
+
+        dff, note_moy, note_cat = compute_stats(req_body)
 
         return func.HttpResponse(
-            json.dumps({"stats": dff , "note_moyenne" :note_moy , "note_par_categorie" : note_cat}),
+            json.dumps({"stats": dff, "note_moyenne": note_moy, "note_par_categorie": note_cat}),
             mimetype="application/json"
         )
 
+    except json.JSONDecodeError:
+        logging.error("Invalid JSON format in request.")
+        return func.HttpResponse(
+            json.dumps({"error": "Invalid JSON format."}),
+            mimetype="application/json",
+            status_code=400
+        )
     except Exception as e:
         logging.error(f"Error processing request: {str(e)}")
         return func.HttpResponse(
             json.dumps({"error": str(e)}),
             mimetype="application/json",
-            status_code=500)
-
-
-
-
-
-
-
-
-
+            status_code=500
+        )
