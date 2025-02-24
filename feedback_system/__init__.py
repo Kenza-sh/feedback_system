@@ -292,7 +292,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         dff, note_moy , note_cat = compute_stats(query)
 
         return func.HttpResponse(
-            json.dumps({"stats": dff , "note moyenne" :note_moy , "note par categorie" : note_cat}),
+            json.dumps({"stats": dff , "note_moyenne" :note_moy , "note_par_categorie" : note_cat}),
             mimetype="application/json"
         )
 
@@ -301,7 +301,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(
             json.dumps({"error": str(e)}),
             mimetype="application/json",
-            status_code=500
+            status_code=500)
 
 
 
