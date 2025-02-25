@@ -37,8 +37,6 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt --target=.
-          pip install transformers
-          pip install torch
 
       # Optional: Add step to run tests here
 
