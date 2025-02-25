@@ -1,21 +1,40 @@
 import azure.functions as func
 import pandas as pd
 import re
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-from transformers import TFAutoModelForSequenceClassification
 import numpy as np
 import json
 import logging
+import pickle
+from azure.storage.blob import BlobServiceClient
+import os
+
+def load_pickle_blobs_from_azure(connection_string, container_name, blob_names):
+    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    
+    # Download and load both blobs
+    models = []
+    for blob_name in blob_names:
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+        
+        # Download the blob data
+        blob_data = blob_client.download_blob()
+        pickle_data = blob_data.readall()
+
+        # Load the pickle data
+        model = pickle.loads(pickle_data)
+        models.append(model)
+
+    # Return the models
+    return models[0], models[1]  # Assuming you want two separate models
+
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class CommentClassifier:
     def __init__(self):
-        self.MODEL_NAME = "nlptown/bert-base-multilingual-uncased-sentiment"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+        self.blob_names =["feedback-system_model/model.pkl","feedback-system_model/tokenizer.pkl"]
+        self.model,self.tokenizer =load_pickle_blobs_from_azure(os.environ["AZURE_STORAGE_CONNECTION_STRING"], os.environ["AZURE_STORAGE_CONTAINER_NAME"], self.blob_names)
         self.rating_percentages = {
         '1 étoile': 10,   # 1 star: 10%
         '2 étoiles': 25,  # 2 stars: 25%
@@ -138,11 +157,10 @@ class CommentClassifier:
             if any(re.search(pattern, comment) for pattern in patterns):
                 labels.append(label)
         return labels
-
-    def predict_sentiment(self,comment):
-        inputs = self.tokenizer(comment, return_tensors="pt", truncation=True, padding=True, max_length=512)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
+        
+    def predict_sentiment(comment):
+        inputs =tokenizer(comment, return_tensors="pt", truncation=True, padding=True, max_length=512)
+        outputs = model(**inputs)
         scores = outputs.logits.softmax(dim=1).tolist()[0]
         labels = ["1 étoile", "2 étoiles", "3 étoiles", "4 étoiles", "5 étoiles",]
         sentiment = labels[np.argmax(scores)]
