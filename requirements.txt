@@ -1,8 +1,7 @@
 azure-functions
 azure-storage-blob
 transformers
-pandas
-numpy
+torch
 
 
 
