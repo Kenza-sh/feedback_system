@@ -6,7 +6,6 @@ import json
 import logging
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
-from transformers import TFAutoModelForSequenceClassification
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -129,7 +128,14 @@ class CommentClassifier:
     ]
 
 }
-
+    def classify_comment(self, comment):
+        labels = []
+        comment = comment.lower()  # On normalise le commentaire en minuscules
+        for label, patterns in self.rules.items():
+            if any(re.search(pattern, comment) for pattern in patterns):
+                labels.append(label)
+        return labels
+        
     def predict_sentiment(self,comment):
         inputs = self.tokenizer(comment, return_tensors="pt", truncation=True, padding=True, max_length=512)
         with torch.no_grad():
@@ -139,13 +145,6 @@ class CommentClassifier:
         sentiment = labels[np.argmax(scores)]
         return sentiment
         
-    def predict_sentiment(comment):
-        inputs =tokenizer(comment, return_tensors="pt", truncation=True, padding=True, max_length=512)
-        outputs = model(**inputs)
-        scores = outputs.logits.softmax(dim=1).tolist()[0]
-        labels = ["1 étoile", "2 étoiles", "3 étoiles", "4 étoiles", "5 étoiles",]
-        sentiment = labels[np.argmax(scores)]
-        return sentiment
 
     def extraire_segments(self,texte,sub_rules):
           rules_extracted = {cle: self.rules[cle] for cle in sub_rules if cle in self.rules}
